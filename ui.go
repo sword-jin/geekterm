@@ -122,6 +122,7 @@ func Draw(app *tview.Application) {
 	contentFlex.AddItem(commentList, 0, 5, false)
 
 	activityList = tview.NewList()
+	activityList.SetSecondaryTextColor(tcell.Color102)
 	activityFrame = tview.NewFrame(activityList)
 	activityFrame.SetBorder(true)
 	activityFrame.SetBorderPadding(0, 0, 1, 1).SetTitle("  我的动态  ")
@@ -198,10 +199,10 @@ func loadPosts(app *tview.Application, offset int, page int) {
 	if firstLoadPosts {
 		// todo，留着这个代码，说不定有用
 		firstLoadPosts = false
-	}
-	// 第一次加载的时候，添加一个 previewPost
-	if len(response.Posts) > 0 {
-		curPreviewPost = response.Posts[0]
+		// 第一次加载的时候，添加一个 previewPost
+		if len(response.Posts) > 0 {
+			curPreviewPost = response.Posts[0]
+		}
 	}
 
 	setAuthInformation(response.AuthInfo)
@@ -303,8 +304,8 @@ func showActivities(app *tview.Application) {
 			if activity.Type == ReplyPost || activity.Type == GetMolecules || activity.Type == YourMoleculesFinish {
 				var title, content string
 				if activity.Type == ReplyPost {
-					title = fmt.Sprintf("%s「%s」在「%s」回复", activity.Time, activity.User.Username, activity.TargetTitle)
-					content = activity.Content
+					content = fmt.Sprintf("%s「%s」在「%s」回复", activity.Time, activity.User.Username, activity.TargetTitle)
+					title = activity.Content
 				} else if activity.Type == GetMolecules {
 					title = fmt.Sprintf("%s %s", activity.Time, activity.TargetTitle)
 					content = "抢到分子"
@@ -339,16 +340,28 @@ func showErrorModal(app *tview.Application, msg string) {
 
 func replyPost(app *tview.Application) {
 	replyTo = replyToPost
-	replyForm.SetTitle("-  回复帖主  ")
+	replyForm.SetTitle(fmt.Sprintf("-  回复「%s」 ", getReplyPostTitle()))
 	pages.SwitchToPage("replyForm")
 	app.SetFocus(replyContentField)
 }
 
 func replyComment(app *tview.Application) {
 	replyTo = replyToComment
-	replyForm.SetTitle(fmt.Sprintf("  回复 %s  ", curComment.Floor))
+	replyForm.SetTitle(fmt.Sprintf("  回复 %s @%s  ", curComment.Floor, curComment.Author.Username))
 	pages.SwitchToPage("replyForm")
 	app.SetFocus(replyContentField)
+}
+
+func getReplyPostTitle() string {
+	if curPost != nil {
+		if len(curPost.Title) > 24 {
+			return curPost.Title[0:24] + "..."
+		} else {
+			return curPost.Title
+		}
+	} else {
+		return curPreviewPost.Title
+	}
 }
 
 func submitReplyForm(app *tview.Application) {
