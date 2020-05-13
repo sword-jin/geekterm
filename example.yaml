@@ -1,0 +1,11 @@
+log-file: /Users/rry/Code/go/src/github.com/rrylee/geekterm/cli/log.txt
+# panic-0
+# fatal-1
+# error-2
+# warn-3
+# info-
+# debug-5
+log-devel: 5
+
+# 登录后的 cookie
+cookie: ""
