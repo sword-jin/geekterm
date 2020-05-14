@@ -31,7 +31,7 @@ func CheckNewVersion() (hasNewVersion bool, newVersion *NewVersion, err error) {
 		content := strings.Join(splitedBody[1:len(splitedBody)], "\n")
 		latestVersion = strings.TrimLeft(latestVersion, "version:")
 
-		if VersionPublishOrder[len(VersionPublishOrder)-1] == latestVersion {
+		if containsVersion(latestVersion) {
 			return false, nil, nil
 		} else {
 			return true, &NewVersion{
@@ -41,4 +41,13 @@ func CheckNewVersion() (hasNewVersion bool, newVersion *NewVersion, err error) {
 		}
 	}
 	return false, nil, nil
+}
+
+func containsVersion(version string) bool {
+	for _, v := range VersionPublishOrder {
+		if v == version {
+			return true
+		}
+	}
+	return false
 }

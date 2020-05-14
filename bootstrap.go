@@ -81,6 +81,7 @@ func handleVersionCheck(app *tview.Application) {
 			newVersionContent.SetTitle(fmt.Sprintf("新版本 %s 发布", newVersion.t))
 			newVersionContent.Clear()
 			newVersionContent.Write([]byte(newVersion.s))
+			newVersionContent.Write([]byte("请到 https://github.com/rrylee/geekterm 手动升级"))
 
 			pages.SwitchToPage("new-version")
 			app.SetFocus(newVersionContent)
