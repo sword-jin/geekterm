@@ -1,7 +1,13 @@
 # Geekhub.com 终端版
 
-尝鲜体验
+![](./doc/m1.png)
 
+### 安装
+#### 下载二进制运行
+
+进入 [release](https://github.com/rrylee/geekterm/releases) 下载对应系统的版本
+
+#### 手动安装
 ```bash
 git clone https://github.com/rrylee/geekterm.git
 
@@ -9,6 +15,8 @@ cd geekterm/cli
 
 go run --mod=vendor . --cookie="你的浏览器cookie"
 ```
+
+获取登录 cookie 请移动到 [wiki](https://github.com/rrylee/geekterm/wiki/%E6%89%8B%E5%8A%A8%E8%8E%B7%E5%8F%96%E7%99%BB%E5%BD%95-cookie)
 
 ### 常用操作
 
@@ -44,6 +52,7 @@ go run --mod=vendor . --cookie="你的浏览器cookie"
 | R        |    直接回帖    |    |
 | m        |    上一页    |  帖子列表和留言  |
 | n        |    下一页    |  帖子列表和留言  |
+| q        |    退出    |    |
 | enter    |    回复评论    | 在评论列表和个人中心  |
 | enter    |    加载    | 加载选择帖子内容  |
 

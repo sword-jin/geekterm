@@ -34,6 +34,8 @@ func Keybinds(app *tview.Application) {
 			}
 
 			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModMask(0))
+		case 'q':
+			app.Stop()
 		case 'k':
 			if app.GetFocus() == contentView {
 				r, _ := contentView.GetScrollOffset()
