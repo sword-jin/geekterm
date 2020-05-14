@@ -28,12 +28,13 @@ func CheckNewVersion() (hasNewVersion bool, newVersion *NewVersion, err error) {
 	latestVersion := splitedBody[0]
 	if strings.HasPrefix(latestVersion, "version:") {
 		content := strings.Join(splitedBody[1:len(splitedBody)], "\n")
+		latestVersion = strings.TrimLeft(latestVersion, "version:")
 
 		if VersionPublishOrder[len(VersionPublishOrder)-1] == latestVersion {
 			return false, nil, nil
 		} else {
 			return true, &NewVersion{
-				t: strings.TrimLeft(latestVersion, "version:"),
+				t: latestVersion,
 				s: content,
 			}, nil
 		}
