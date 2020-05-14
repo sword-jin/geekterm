@@ -19,6 +19,7 @@ var (
 var (
 	configFile = flag.String("config-file", "", "yaml config file")
 	cookie     = flag.String("cookie", "", "geekhub cookie")
+	logLevel   = flag.Int("log-level", -1, "log level")
 )
 
 // Main entry point.
@@ -41,6 +42,7 @@ func main() {
 	geekhub.Setup(cfg)
 	geekhub.Draw(app)
 	geekhub.Keybinds(app)
+	geekhub.WatchUpgrade(app)
 
 	if err := app.Run(); err != nil {
 		fmt.Printf("Error running application: %s\n", err)
@@ -66,6 +68,9 @@ func initConfig(v *viper.Viper) *geekhub.Config {
 	}
 
 	cfg.LogLevel = v.GetInt("log-level")
+	if *logLevel >= 0 {
+		cfg.LogLevel = *logLevel
+	}
 
 	if *cookie != "" {
 		cfg.Cookie = *cookie

@@ -23,7 +23,6 @@ func Keybinds(app *tview.Application) {
 		case 'j':
 			if app.GetFocus() == contentView {
 				r, _ := contentView.GetScrollOffset()
-
 				if !curPost.clickedDown {
 					curPost.clickedDown = true
 				} else {
@@ -31,6 +30,7 @@ func Keybinds(app *tview.Application) {
 						app.SetFocus(commentList)
 					}
 				}
+				curPost.lastScrollRow = r
 			}
 
 			return tcell.NewEventKey(tcell.KeyDown, 0, tcell.ModMask(0))

@@ -44,6 +44,11 @@ func (GeekHubTestSuite) TestPostComment() {
 	}))
 }
 
+func (GeekHubTestSuite) TestGetSignStatus() {
+	spew.Dump(geekhub.GeekHub.GetSignStatus())
+}
+
 func (GeekHubTestSuite) SetupSuite() {
-	geekhub.Setup(nil)
+	geekhub.Setup(&geekhub.Config{
+	})
 }

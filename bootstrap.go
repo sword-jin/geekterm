@@ -1,10 +1,12 @@
 package geekhub
 
 import (
+	"fmt"
 	"os"
+	"time"
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
-	"github.com/go-resty/resty/v2"
+	"github.com/rivo/tview"
 	"github.com/sirupsen/logrus"
 )
 
@@ -16,7 +18,6 @@ func Setup(cfg *Config) {
 	logger.Out = f
 	logger.SetLevel(logrus.Level(MyConfig.LogLevel))
 
-	httpClient = resty.New()
 	httpClient.SetHeader("User-Agent", DefaultUserAgent)
 	httpClient.SetHeader("Cookie", cfg.Cookie)
 	httpClient.SetContentLength(true)
@@ -53,5 +54,36 @@ func Setup(cfg *Config) {
 			"  拼车  ",
 			GeekHub.GetGroupBuysPage,
 		},
+	}
+}
+
+func WatchUpgrade(app *tview.Application) {
+	go func() {
+		firstTimer := time.NewTimer(3 * time.Second)
+		<-firstTimer.C
+		handleVersionCheck(app)
+
+		timer := time.NewTicker(1 * time.Hour)
+
+		for range timer.C {
+			handleVersionCheck(app)
+		}
+	}()
+}
+
+func handleVersionCheck(app *tview.Application) {
+	hasNewVersion, newVersion, err := CheckNewVersion()
+	Infof("WatchUpgrade %v-%v-%v", hasNewVersion, newVersion, err)
+	if err != nil {
+		Warnf("WatchUpgrade error:%v", err)
+	} else {
+		if hasNewVersion {
+			newVersionContent.SetTitle(fmt.Sprintf("新版本 %s 发布", newVersion.t))
+			newVersionContent.Clear()
+			newVersionContent.Write([]byte(newVersion.s))
+
+			pages.SwitchToPage("new-version")
+			app.SetFocus(newVersionContent)
+		}
 	}
 }

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	httpClient *resty.Client
+	httpClient = resty.New()
 	GeekHub    IGeekHub
 )
 
@@ -25,6 +25,8 @@ const (
 	ActivitiesURI  = "activities"
 	PostCommentURI = "comments"
 	GbitOrderURI   = "gbit_orders"
+	CheckinsURI    = "checkins"
+	SignURI        = "checkins/start"
 )
 
 type ConfigAttrSelectors struct {
@@ -209,6 +211,9 @@ type IGeekHub interface {
 	GetPostContent(pageUri string) (*ContentPageResponse, error)
 	GetActivities(page int) (*ActivitiesPageResponse, error)
 	PostComment(arg *PostCommentArgs) error
+
+	GetSignStatus() (bool, string, error) //获取签到状态
+	CheckIn(token string) error           //签到
 }
 
 type geekHub struct {
@@ -498,5 +503,33 @@ func (gh *geekHub) PostComment(arg *PostCommentArgs) error {
 		Post(HomePage + PostCommentURI)
 
 	Debugf("PostComment Response, status:%d", response.StatusCode())
+	return err
+}
+
+func (gh *geekHub) GetSignStatus() (bool, string, error) {
+	doc, err := gh.getQueryDocFromUrl(HomePage + CheckinsURI)
+	if err != nil {
+		return false, "", err
+	}
+
+	token, _ := doc.Find("head meta").Eq(3).Attr("content")
+	content := doc.Find(".btn.btn-blue.btn-big.block.text-center").Text()
+	if content == "签到" {
+		return false, token, nil
+	} else {
+		return true, token, nil
+	}
+}
+
+func (gh *geekHub) CheckIn(token string) error {
+	response, err := httpClient.R().
+		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetHeader("Cache-Control", "no-cache").
+		SetFormData(map[string]string{
+			"_method":            "post",
+			"authenticity_token": token,
+		}).
+		Post(HomePage + SignURI)
+	Debugf("CheckIn response body:%s", string(response.Body()))
 	return err
 }

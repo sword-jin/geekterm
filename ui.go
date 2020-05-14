@@ -33,6 +33,14 @@ var (
 	welcomePage *tview.Flex
 	welcomeList *tview.List
 
+	shutcutTable    *tview.Table
+	shutcutPageFlex *tview.Flex
+	shutcutPage     *tview.Frame
+
+	newVersionContent *tview.TextView
+	newVersionFlex    *tview.Flex
+	newVersionPage    *tview.Frame
+
 	pages *tview.Pages
 
 	replyFlex         *tview.Flex
@@ -40,13 +48,14 @@ var (
 	replyContentField *tview.InputField
 	errorModal        *tview.Modal
 
-	curPostsPage   = 1
-	curOffset      = 0 //当前浏览的区域（分子，拼车）
-	curPost        *DetailPost
-	curPreviewPost *PreviewPost
-	curAuth        *AuthInfo
-	curComment     *Comment
-	curComments    []*Comment
+	curPostsPage     = 1
+	curOffset        = 0 //当前浏览的区域（分子，拼车）
+	curPost          *DetailPost
+	curPreviewPost   *PreviewPost
+	curAuth          *AuthInfo
+	curComment       *Comment
+	curComments      []*Comment
+	globalHasCheckIn bool //已签到
 
 	replyToken string
 	replyTo    int8
@@ -172,17 +181,51 @@ func Draw(app *tview.Application) {
 	})
 	loadPosts(app, 0, 1)
 
+	initWelcomePage(app)
+
+	initShutcutPage(app)
+
+	newVersionContent = tview.NewTextView()
+	newVersionContent.SetBorder(true).SetTitleColor(tcell.ColorGreen)
+	newVersionContent.SetBorderPadding(0, 0, 1, 1)
+
+	newVersionFlex = tview.NewFlex()
+	newVersionFlex.AddItem(tview.NewBox(), 0, 1, false)
+	newVersionFlex.AddItem(tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox(), 0, 2, false).
+		AddItem(newVersionContent, 0, 3, true).
+		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
+	newVersionFlex.AddItem(tview.NewBox(), 0, 1, false)
+
+	newVersionPage = tview.NewFrame(newVersionFlex)
+	newVersionPage.SetBorder(true)
+
+	pages = tview.NewPages().
+		AddPage("welcome", welcomePage, true, true).
+		AddPage("shutcut", shutcutPage, true, false).
+		AddPage("main", mainFlex, true, false).
+		AddPage("activities", activityFrame, true, false).
+		AddPage("replyForm", replyFlex, true, false).
+		AddPage("errorModal", errorModal, true, false).
+		AddPage("new-version", newVersionPage, true, false)
+	app.SetRoot(pages, true)
+}
+
+func initWelcomePage(app *tview.Application) {
 	welcomeList = tview.NewList()
 	welcomeList.SetBorder(true)
 	welcomeList.SetBorderAttributes(tcell.AttrUnderline)
 	welcomeList.SetBorderPadding(1, 1, 2, 2)
 	welcomeList.SetHighlightFullLine(true)
-	welcomeList.SetTitle(fmt.Sprintf("  Welcome to geekterm %s  ", version))
+	welcomeList.SetTitle(fmt.Sprintf("  Welcome to geekterm %s  ", Version))
+	welcomeList.SetTitleColor(tcell.ColorPink)
 	welcomeList.AddItem("进入", "", 0, func() {
-		pages.SwitchToPage("main")
-		app.SetFocus(category)
+		enterGeekhub(app)
 	})
 	welcomeList.AddItem("快捷键", "", 0, func() {
+		pages.SwitchToPage("shutcut")
+		app.SetFocus(shutcutTable)
 	})
 	welcomeList.AddItem("🐞提交BUG", "", 0, func() {
 		OpenChrome(NewOpenableUrl("https://github.com/rrylee/geekterm"))
@@ -200,14 +243,66 @@ func Draw(app *tview.Application) {
 		AddItem(welcomeList, 0, 3, true).
 		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
 	welcomePage.AddItem(tview.NewBox(), 0, 1, false)
+}
 
-	pages = tview.NewPages().
-		AddPage("welcome", welcomePage, true, true).
-		AddPage("main", mainFlex, true, false).
-		AddPage("activities", activityFrame, true, false).
-		AddPage("replyForm", replyFlex, true, false).
-		AddPage("errorModal", errorModal, true, false)
-	app.SetRoot(pages, true)
+func enterGeekhub(app *tview.Application) {
+	pages.SwitchToPage("main")
+	app.SetFocus(category)
+
+	if curAuth != nil {
+		// 自动签到
+		hasCheck, signToken, err := GeekHub.GetSignStatus()
+		if err != nil {
+			showErrorModal(app, "获取签到信息失败")
+			return
+		} else {
+			if !hasCheck {
+				err = GeekHub.CheckIn(signToken)
+				if err != nil {
+					globalHasCheckIn = true
+				}
+			} else {
+				globalHasCheckIn = true
+			}
+		}
+	}
+}
+
+func initShutcutPage(app *tview.Application) {
+	shutcutTable = tview.NewTable()
+	shutcutTable.SetBorder(true)
+	shutcutTable.SetBorderPadding(0, 0, 2, 2)
+	shutcutTable.SetTitle("  快捷键列表  ")
+
+	shutcutPageFlex = tview.NewFlex()
+	shutcutPageFlex.AddItem(tview.NewBox(), 0, 1, false)
+	shutcutPageFlex.AddItem(tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox(), 0, 2, false).
+		AddItem(shutcutTable, 0, 3, true).
+		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
+	shutcutPageFlex.AddItem(tview.NewBox(), 0, 1, false)
+
+	shutcutPage = tview.NewFrame(shutcutPageFlex)
+
+	for i, name := range ShutcutTitles {
+		shutcutTable.SetCell(0, i, &tview.TableCell{Text: name, Align: tview.AlignCenter, Color: tcell.ColorDarkMagenta})
+	}
+
+	for _, key := range ShutcutKeys {
+		row := shutcutTable.GetRowCount()
+		shutcutTable.SetCell(row, 0, &tview.TableCell{Text: key[0], Align: tview.AlignCenter, Color: tcell.ColorWhite})
+		shutcutTable.SetCell(row, 1, &tview.TableCell{Text: key[1], Align: tview.AlignCenter, Color: tcell.ColorGrey})
+		shutcutTable.SetCell(row, 2, &tview.TableCell{Text: key[2], Align: tview.AlignCenter, Color: tcell.ColorGrey})
+	}
+
+	shutcutTable.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEscape:
+			pages.SwitchToPage("welcome")
+			app.SetFocus(welcomeList)
+		}
+	})
 }
 
 func initErrorModal() {
@@ -318,6 +413,10 @@ func setLoganAuthInfo(authInfo *AuthInfo) {
 	authStatusView.SetBorderPadding(0, 0, 1, 0)
 	authStatusView.Write([]byte(authInfo.Me.Username + "\n"))
 	authStatusView.Write([]byte("⏰: " + authInfo.NotifyCount + " 未读\n"))
+
+	if globalHasCheckIn {
+		authStatusView.Write([]byte("已签到\n"))
+	}
 }
 
 func showActivities(app *tview.Application) {
