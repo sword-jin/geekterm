@@ -156,6 +156,7 @@ type DetailPost struct {
 	PV               string
 	CommentCount     int64
 	CommentTotalPage int64
+	CurCommentPage   int
 	Comments         []*Comment
 
 	//helper
@@ -208,7 +209,7 @@ type IGeekHub interface {
 	GetMoleculesPage(page int) (*PostPageResponse, error)
 	GetGroupBuysPage(page int) (*PostPageResponse, error)
 
-	GetPostContent(pageUri string) (*ContentPageResponse, error)
+	GetPostContent(pageUri string, page int) (*ContentPageResponse, error)
 	GetActivities(page int) (*ActivitiesPageResponse, error)
 	PostComment(arg *PostCommentArgs) error
 
@@ -296,8 +297,12 @@ func buildUserFromNode(node *goquery.Selection) *User {
 	}
 }
 
-func (gh *geekHub) GetPostContent(pageUri string) (*ContentPageResponse, error) {
-	doc, err := gh.getQueryDocFromUrl(HomePage + pageUri)
+func (gh *geekHub) GetPostContent(pageUri string, page int) (*ContentPageResponse, error) {
+	url := HomePage + pageUri
+	if page > 0 {
+		url += fmt.Sprintf("?page=%d", page)
+	}
+	doc, err := gh.getQueryDocFromUrl(url)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +330,13 @@ func (gh *geekHub) GetPostContent(pageUri string) (*ContentPageResponse, error) 
 	commentCount := strings.TrimRight(strings.TrimSpace(doc.Find(gh.Selectors.PostPageCommentCount).Text()), " 回复")
 	response.Post.CommentCount, _ = strconv.ParseInt(commentCount, 10, 64)
 	response.Post.CommentTotalPage = response.Post.CommentCount/100 + 1
+	curPage := strings.TrimSpace(doc.Find("nav .px-2.py-px.rounded.bg-primary-300").Text())
+	if curPage != "" {
+		response.Post.CurCommentPage, _ = strconv.Atoi(curPage)
+		Debugf("response curPage is %d", response.Post.CurCommentPage)
+	} else {
+		response.Post.CurCommentPage = 1
+	}
 
 	doc.Find(gh.Selectors.CommentList).Each(func(_ int, selection *goquery.Selection) {
 		var parent *Comment

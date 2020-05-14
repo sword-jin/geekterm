@@ -53,9 +53,15 @@ func Keybinds(app *tview.Application) {
 				Debugf("start load next page")
 				loadPosts(app, curOffset, curPostsPage+1)
 			}
+			if curFocus == commentList && curCommentPage < int(curCommentTotalPage) {
+				doLoadPost(curPost.Uri, curCommentPage+1)
+			}
 		case 'n': //previous page
 			if curFocus == posts && curPostsPage > 1 {
 				loadPosts(app, curOffset, curPostsPage-1)
+			}
+			if curFocus == commentList && curCommentPage > 1 {
+				doLoadPost(curPost.Uri, curCommentPage-1)
 			}
 		case 'M':
 			if curFocus == posts || curFocus == contentView {

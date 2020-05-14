@@ -48,14 +48,16 @@ var (
 	replyContentField *tview.InputField
 	errorModal        *tview.Modal
 
-	curPostsPage     = 1
-	curOffset        = 0 //当前浏览的区域（分子，拼车）
-	curPost          *DetailPost
-	curPreviewPost   *PreviewPost
-	curAuth          *AuthInfo
-	curComment       *Comment
-	curComments      []*Comment
-	globalHasCheckIn bool //已签到
+	curPostsPage        = 1
+	curOffset           = 0 //当前浏览的区域（分子，拼车）
+	curPost             *DetailPost
+	curPreviewPost      *PreviewPost
+	curAuth             *AuthInfo
+	curCommentPage      int
+	curCommentTotalPage int64
+	curComment          *Comment
+	curComments         []*Comment
+	globalHasCheckIn    bool //已签到
 
 	replyToken string
 	replyTo    int8
@@ -67,16 +69,56 @@ const (
 )
 
 func Draw(app *tview.Application) {
+	initCategory(app)
+
+	initAuthStatus()
+
+	initSiderbar()
+
+	initPosts()
+
+	initPostContent()
+
+	initActivity()
+
+	initReply(app)
+
+	initErrorModal()
+
+	loadPosts(app, 0, 1)
+
+	initWelcomePage(app)
+
+	initShutcutPage(app)
+
+	initNewVersion()
+
+	//布局
+	mainFlex = tview.NewFlex()
+	mainFlex.SetTitle("terminal for Geekhub.com.")
+	mainFlex.AddItem(siderbar, 0, 1, true).
+		AddItem(posts, 0, 5, false)
+
+	pages = tview.NewPages().
+		AddPage("welcome", welcomePage, true, true).
+		AddPage("shutcut", shutcutPage, true, false).
+		AddPage("main", mainFlex, true, false).
+		AddPage("activities", activityFrame, true, false).
+		AddPage("replyForm", replyFlex, true, false).
+		AddPage("errorModal", errorModal, true, false).
+		AddPage("new-version", newVersionPage, true, false)
+	app.SetRoot(pages, true)
+}
+
+func initSiderbar() {
 	siderbar = tview.NewFlex().SetDirection(tview.FlexRow)
 	siderbar.SetBorder(true).SetTitle(" 目录 ")
 	siderbar.SetBorderPadding(0, 0, 1, 1)
+	siderbar.AddItem(category, 0, 4, true)
+	siderbar.AddItem(authStatusView, 0, 1, true)
+}
 
-	category = tview.NewList().ShowSecondaryText(false)
-	category.SetBorder(false)
-	category.SetHighlightFullLine(true)
-	category.SetSelectedFocusOnly(true)
-	category.SetSelectedBackgroundColor(tcell.ColorLightBlue)
-
+func initAuthStatus() {
 	authStatusView = tview.NewTextView()
 	authStatusView.SetBorder(true)
 	authStatusView.SetTitle(" 用户 ")
@@ -98,47 +140,44 @@ func Draw(app *tview.Application) {
 			}
 		}
 	}()
+}
 
-	siderbar.AddItem(category, 0, 4, true)
-	siderbar.AddItem(authStatusView, 0, 1, true)
+func initCategory(app *tview.Application) {
+	category = tview.NewList().ShowSecondaryText(false)
+	category.SetBorder(false)
+	category.SetHighlightFullLine(true)
+	category.SetSelectedFocusOnly(true)
+	category.SetSelectedBackgroundColor(tcell.ColorLightBlue)
+	for _, item := range categoryList {
+		category.AddItem(item.name, "", 0, nil)
+	}
 
-	posts = tview.NewList().ShowSecondaryText(true)
-	posts.SetSecondaryTextColor(tcell.Color102)
-	posts.SetBorder(true).SetTitle(" 列表 ")
-	posts.SetHighlightFullLine(true)
-	posts.SetSelectedBackgroundColor(tcell.ColorLightBlue)
-	posts.SetSelectedFocusOnly(true)
-	posts.SetBorderPadding(0, 0, 1, 1)
-
-	contentFlex = tview.NewFlex()
-	contentFlex.SetBorder(true)
-	contentFlex.SetDirection(tview.FlexRow)
-	contentShowing = false
-
-	contentView = tview.NewTextView()
-	contentView.SetTitle("  内容  ")
-	contentView.SetBorder(true)
-	contentView.SetScrollable(true)
-	contentView.SetBorderPadding(0, 0, 1, 1)
-
-	commentList = tview.NewList()
-	commentList.SetSelectedFocusOnly(true)
-	commentList.SetBorder(true).SetTitle("  留言  ")
-	commentList.SetBorderPadding(0, 0, 1, 0)
-	commentList.SetSecondaryTextColor(tcell.Color102)
-	commentList.SetChangedFunc(func(i int, _ string, _ string, _ rune) {
-		curComment = curComments[i]
+	//左侧选择区域
+	category.SetSelectedFunc(func(i int, _ string, _ string, _ rune) {
+		app.SetFocus(posts)
+		loadPosts(app, i, 1)
 	})
+}
 
-	contentFlex.AddItem(contentView, 0, 5, true)
-	contentFlex.AddItem(commentList, 0, 5, false)
+func initNewVersion() {
+	newVersionContent = tview.NewTextView()
+	newVersionContent.SetBorder(true).SetTitleColor(tcell.ColorGreen)
+	newVersionContent.SetBorderPadding(0, 0, 1, 1)
 
-	activityList = tview.NewList()
-	activityList.SetSecondaryTextColor(tcell.Color102)
-	activityFrame = tview.NewFrame(activityList)
-	activityFrame.SetBorder(true)
-	activityFrame.SetBorderPadding(0, 0, 1, 1).SetTitle("  我的动态  ")
+	newVersionFlex = tview.NewFlex()
+	newVersionFlex.AddItem(tview.NewBox(), 0, 1, false)
+	newVersionFlex.AddItem(tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox(), 0, 2, false).
+		AddItem(newVersionContent, 0, 3, true).
+		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
+	newVersionFlex.AddItem(tview.NewBox(), 0, 1, false)
 
+	newVersionPage = tview.NewFrame(newVersionFlex)
+	newVersionPage.SetBorder(true)
+}
+
+func initReply(app *tview.Application) {
 	replyForm = tview.NewForm()
 	replyForm.SetBorder(true)
 	replyForm.SetBorderPadding(1, 1, 1, 1)
@@ -161,55 +200,49 @@ func Draw(app *tview.Application) {
 		AddItem(replyForm, 0, 3, true).
 		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
 	replyFlex.AddItem(tview.NewBox(), 0, 1, false)
+}
 
-	initErrorModal()
+func initActivity() {
+	activityList = tview.NewList()
+	activityList.SetSecondaryTextColor(tcell.Color102)
+	activityFrame = tview.NewFrame(activityList)
+	activityFrame.SetBorder(true)
+	activityFrame.SetBorderPadding(0, 0, 1, 1).SetTitle("  我的动态  ")
+}
 
-	//布局
-	mainFlex = tview.NewFlex()
-	mainFlex.SetTitle("terminal for Geekhub.com.")
-	mainFlex.AddItem(siderbar, 0, 1, true).
-		AddItem(posts, 0, 5, false)
+func initPostContent() {
+	contentFlex = tview.NewFlex()
+	contentFlex.SetBorder(true)
+	contentFlex.SetDirection(tview.FlexRow)
+	contentShowing = false
 
-	for _, item := range categoryList {
-		category.AddItem(item.name, "", 0, nil)
-	}
+	contentView = tview.NewTextView()
+	contentView.SetTitle("  内容  ")
+	contentView.SetBorder(true)
+	contentView.SetScrollable(true)
+	contentView.SetBorderPadding(0, 0, 1, 1)
 
-	//左侧选择区域
-	category.SetSelectedFunc(func(i int, _ string, _ string, _ rune) {
-		app.SetFocus(posts)
-		loadPosts(app, i, 1)
+	commentList = tview.NewList()
+	commentList.SetSelectedFocusOnly(true)
+	commentList.SetBorder(true).SetTitle("  留言  ")
+	commentList.SetBorderPadding(0, 0, 1, 0)
+	commentList.SetSecondaryTextColor(tcell.Color102)
+	commentList.SetChangedFunc(func(i int, _ string, _ string, _ rune) {
+		curComment = curComments[i]
 	})
-	loadPosts(app, 0, 1)
 
-	initWelcomePage(app)
+	contentFlex.AddItem(contentView, 0, 5, true)
+	contentFlex.AddItem(commentList, 0, 5, false)
+}
 
-	initShutcutPage(app)
-
-	newVersionContent = tview.NewTextView()
-	newVersionContent.SetBorder(true).SetTitleColor(tcell.ColorGreen)
-	newVersionContent.SetBorderPadding(0, 0, 1, 1)
-
-	newVersionFlex = tview.NewFlex()
-	newVersionFlex.AddItem(tview.NewBox(), 0, 1, false)
-	newVersionFlex.AddItem(tview.NewFlex().
-		SetDirection(tview.FlexRow).
-		AddItem(tview.NewBox(), 0, 2, false).
-		AddItem(newVersionContent, 0, 3, true).
-		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
-	newVersionFlex.AddItem(tview.NewBox(), 0, 1, false)
-
-	newVersionPage = tview.NewFrame(newVersionFlex)
-	newVersionPage.SetBorder(true)
-
-	pages = tview.NewPages().
-		AddPage("welcome", welcomePage, true, true).
-		AddPage("shutcut", shutcutPage, true, false).
-		AddPage("main", mainFlex, true, false).
-		AddPage("activities", activityFrame, true, false).
-		AddPage("replyForm", replyFlex, true, false).
-		AddPage("errorModal", errorModal, true, false).
-		AddPage("new-version", newVersionPage, true, false)
-	app.SetRoot(pages, true)
+func initPosts() {
+	posts = tview.NewList().ShowSecondaryText(true)
+	posts.SetSecondaryTextColor(tcell.Color102)
+	posts.SetBorder(true).SetTitle(" 列表 ")
+	posts.SetHighlightFullLine(true)
+	posts.SetSelectedBackgroundColor(tcell.ColorLightBlue)
+	posts.SetSelectedFocusOnly(true)
+	posts.SetBorderPadding(0, 0, 1, 1)
 }
 
 func initWelcomePage(app *tview.Application) {
@@ -349,32 +382,37 @@ func loadPosts(app *tview.Application, offset int, page int) {
 
 func loadPost(app *tview.Application, post *PreviewPost) *tview.List {
 	return posts.AddItem(post.Title, getPostSecondaryText(post), 0, func() {
-		doLoadPost(post.Uri)
+		doLoadPost(post.Uri, -1)
 	})
 }
 
-func doLoadPost(uri string) {
+func doLoadPost(uri string, page int) {
 	if !contentShowing {
 		mainFlex.AddItem(contentFlex, 0, 5, false)
 		contentShowing = true
 	}
-	postResponse := doRequestPost(uri)
+	postResponse := doRequestPost(uri, page)
 
 	commentList.Clear()
 	curComment = nil
+	curCommentPage = postResponse.Post.CurCommentPage
+	curCommentTotalPage = postResponse.Post.CommentTotalPage
 	comments := reverseComments(postResponse.Post.Comments)
 	if len(comments) > 0 {
 		curComment = comments[0]
 		curComments = comments
+		commentList.SetTitle(fmt.Sprintf("  评论第%d页  ", curCommentPage))
 	}
 	for _, comment := range comments {
 		commentList.AddItem(comment.Floor+" "+comment.Content, fmt.Sprintf("「%s」%s", comment.Author.Username, comment.CommentTime), 0, nil)
 	}
+
+	Debugf("curCommentPage is %d", curCommentPage)
 }
 
 // 这里把一些contentView的操作也做了
-func doRequestPost(uri string) *ContentPageResponse {
-	postResponse, err := GeekHub.GetPostContent(uri)
+func doRequestPost(uri string, page int) *ContentPageResponse {
+	postResponse, err := GeekHub.GetPostContent(uri, page)
 	if err != nil {
 		// todo 错误处理
 	}
@@ -448,7 +486,7 @@ func showActivities(app *tview.Application) {
 				activityList.AddItem(title, content, 0, func() {
 					pages.SwitchToPage("main")
 					app.SetFocus(commentList)
-					doLoadPost(activity.TargetUri)
+					doLoadPost(activity.TargetUri, -1)
 				})
 			} else if activity.Type == GbitOrder {
 				activityList.AddItem(fmt.Sprintf("%s %s", activity.Time, activity.Content), "福利订单", 0, func() {
@@ -499,7 +537,7 @@ func getReplyPostTitle() string {
 func submitReplyForm(app *tview.Application) {
 	if curPost == nil {
 		//load cur post
-		doRequestPost(curPreviewPost.Uri)
+		doRequestPost(curPreviewPost.Uri, -1)
 	}
 
 	replyArg := &PostCommentArgs{
@@ -523,7 +561,7 @@ func submitReplyForm(app *tview.Application) {
 	replyContentField.SetText("")
 	replyToken = ""
 	pages.SwitchToPage("main")
-	doLoadPost(curPost.Uri)
+	doLoadPost(curPost.Uri, -1)
 	app.SetFocus(commentList)
 }
 

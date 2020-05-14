@@ -1,3 +1,8 @@
-version:beta0.2
+version:beta0.3
 
-- 修复 l 移动造成的奔溃问题
+- 评论分页
+- 分子页面详情数据
+- 个人用户数据增加
+    - Git
+    - Star
+    - Score
