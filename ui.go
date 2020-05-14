@@ -30,6 +30,9 @@ var (
 	activityList  *tview.List
 	activityFrame *tview.Frame
 
+	welcomePage *tview.Flex
+	welcomeList *tview.List
+
 	pages *tview.Pages
 
 	replyFlex         *tview.Flex
@@ -169,8 +172,38 @@ func Draw(app *tview.Application) {
 	})
 	loadPosts(app, 0, 1)
 
+	welcomeList = tview.NewList()
+	welcomeList.SetBorder(true)
+	welcomeList.SetBorderAttributes(tcell.AttrUnderline)
+	welcomeList.SetBorderPadding(1, 1, 2, 2)
+	welcomeList.SetHighlightFullLine(true)
+	welcomeList.SetTitle(fmt.Sprintf("  Welcome to geekterm %s  ", version))
+	welcomeList.AddItem("进入", "", 0, func() {
+		pages.SwitchToPage("main")
+		app.SetFocus(category)
+	})
+	welcomeList.AddItem("快捷键", "", 0, func() {
+	})
+	welcomeList.AddItem("🐞提交BUG", "", 0, func() {
+		OpenChrome(NewOpenableUrl("https://github.com/rrylee/geekterm"))
+	})
+	welcomeList.AddItem("⭐️Github", "", 0, func() {
+		OpenChrome(NewOpenableUrl("https://github.com/rrylee/geekterm/issues"))
+	})
+
+	welcomePage = tview.NewFlex()
+	welcomePage.SetBorder(false)
+	welcomePage.AddItem(tview.NewBox(), 0, 1, false)
+	welcomePage.AddItem(tview.NewFlex().
+		SetDirection(tview.FlexRow).
+		AddItem(tview.NewBox(), 0, 2, false).
+		AddItem(welcomeList, 0, 3, true).
+		AddItem(tview.NewBox(), 0, 2, false), 0, 1, true)
+	welcomePage.AddItem(tview.NewBox(), 0, 1, false)
+
 	pages = tview.NewPages().
-		AddPage("main", mainFlex, true, true).
+		AddPage("welcome", welcomePage, true, true).
+		AddPage("main", mainFlex, true, false).
 		AddPage("activities", activityFrame, true, false).
 		AddPage("replyForm", replyFlex, true, false).
 		AddPage("errorModal", errorModal, true, false)
