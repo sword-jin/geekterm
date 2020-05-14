@@ -117,8 +117,10 @@ func handleRight(app *tview.Application) {
 	if app.GetFocus() == category {
 		app.SetFocus(posts)
 	} else if app.GetFocus() == posts {
-		app.SetFocus(contentView)
-		contentView.SetBorderColor(tcell.ColorGreen)
+		if contentShowing { //修复，在contentView没有显示的时候，造成的错误
+			app.SetFocus(contentView)
+			contentView.SetBorderColor(tcell.ColorGreen)
+		}
 	}
 }
 

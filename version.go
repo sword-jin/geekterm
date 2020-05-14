@@ -4,10 +4,11 @@ import (
 	"strings"
 )
 
-var Version = "beta0.1"
+var Version = "beta0.2"
 
 var VersionPublishOrder = []string{
 	"beta0.1",
+	"beta0.2",
 }
 
 const VersionFile = "https://raw.githubusercontent.com/rrylee/geekterm/master/version.txt"
