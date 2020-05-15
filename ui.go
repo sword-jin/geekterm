@@ -224,7 +224,7 @@ func initPostContent() {
 
 	commentList = tview.NewList()
 	commentList.SetSelectedFocusOnly(true)
-	commentList.SetBorder(true).SetTitle("  留言  ")
+	commentList.SetBorder(true).SetTitle("  评论  ")
 	commentList.SetBorderPadding(0, 0, 1, 0)
 	commentList.SetSecondaryTextColor(tcell.Color102)
 	commentList.SetChangedFunc(func(i int, _ string, _ string, _ rune) {
@@ -298,6 +298,10 @@ func enterGeekhub(app *tview.Application) {
 				globalHasCheckIn = true
 			}
 		}
+	}
+
+	if globalHasCheckIn {
+		setLoganAuthInfo(curAuth)
 	}
 }
 
@@ -422,7 +426,26 @@ func doRequestPost(uri string, page int) *ContentPageResponse {
 	contentView.SetTitle(fmt.Sprintf("  内容(%s)  ", curPost.PV))
 	contentView.Clear()
 	contentView.ScrollToBeginning()
-	contentView.Write([]byte(`  标题：` + curPost.Title + "\n\n"))
+	contentView.Write([]byte(`  标题：` + curPost.Title + "\n"))
+	contentView.Write([]byte("  楼主：" + curPost.Author.Username + "发布于" + curPost.PublishTime + "\n\n"))
+
+	if curPost.PostType == MoleculeType {
+		moleculeInfo, ok := curPost.ExtraInfo.(*MoleculesInfo)
+		if ok {
+			contentView.Write([]byte(`  分子贴：` + moleculeInfo.Name + "\n"))
+			contentView.Write([]byte(`  价值：` + moleculeInfo.Price + "\n"))
+			contentView.Write([]byte(`  中奖比例：` + moleculeInfo.Molecule + "/" + moleculeInfo.Denominator + "\n"))
+			contentView.Write([]byte(`  物流：` + moleculeInfo.HowToSend + "\n"))
+			contentView.Write([]byte(`  联系方式：` + moleculeInfo.Contact + "\n"))
+
+			if moleculeInfo.Floor != "" {
+				contentView.Write([]byte(`  分子楼层：` + moleculeInfo.Floor + "\n\n"))
+			} else {
+				contentView.Write([]byte("\n"))
+			}
+		}
+	}
+
 	contentView.Write([]byte(postResponse.Post.Content))
 	return postResponse
 }

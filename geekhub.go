@@ -59,6 +59,8 @@ type ConfigAttrSelectors struct {
 	ReplyToken                string
 	CommentParentUser         string
 	CommentParentContent      string
+	CommentCurPage            string
+	CheckInButton             string
 }
 
 func GetDefaultConfigAttrSelectors() *ConfigAttrSelectors {
@@ -92,6 +94,8 @@ func GetDefaultConfigAttrSelectors() *ConfigAttrSelectors {
 		ActivityYourMoleculesLink: ".flex-1 a",
 		ActivityTime:              "div:nth-of-type(3)",
 		ReplyToken:                "form#comment-box-form>input:nth-of-type(1)",
+		CommentCurPage:            "nav .px-2.py-px.rounded.bg-primary-300",
+		CheckInButton:             ".btn.btn-blue.btn-big.block.text-center",
 	}
 }
 
@@ -158,10 +162,22 @@ type DetailPost struct {
 	CommentTotalPage int64
 	CurCommentPage   int
 	Comments         []*Comment
+	ExtraInfo        interface{}
 
 	//helper
 	lastScrollRow int
 	clickedDown   bool //按下
+}
+
+type MoleculesInfo struct {
+	Name        string
+	Price       string
+	Molecule    string //分子
+	Denominator string //分母
+	HowToSend   string
+	Contact     string
+	CountDown   string //倒计时
+	Floor       string
 }
 
 func (p DetailPost) GetUrl() string {
@@ -330,12 +346,28 @@ func (gh *geekHub) GetPostContent(pageUri string, page int) (*ContentPageRespons
 	commentCount := strings.TrimRight(strings.TrimSpace(doc.Find(gh.Selectors.PostPageCommentCount).Text()), " 回复")
 	response.Post.CommentCount, _ = strconv.ParseInt(commentCount, 10, 64)
 	response.Post.CommentTotalPage = response.Post.CommentCount/100 + 1
-	curPage := strings.TrimSpace(doc.Find("nav .px-2.py-px.rounded.bg-primary-300").Text())
+	curPage := strings.TrimSpace(doc.Find(gh.Selectors.CommentCurPage).Text())
 	if curPage != "" {
 		response.Post.CurCommentPage, _ = strconv.Atoi(curPage)
 		Debugf("response curPage is %d", response.Post.CurCommentPage)
 	} else {
 		response.Post.CurCommentPage = 1
+	}
+
+	if response.Post.PostType == MoleculeType {
+		MoleculesInfo := &MoleculesInfo{
+			Name:        strings.TrimSpace(doc.Find(".flex.items-center.mb-2:nth-of-type(1) .flex-1:nth-of-type(2)").Text()),
+			Price:       strings.TrimSpace(doc.Find(".flex.items-center.mb-5:nth-of-type(2) div:nth-of-type(2)").Text()),
+			Molecule:    strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(4) div:nth-of-type(2)").Text()),
+			Denominator: strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(5) div:nth-of-type(2)").Text()),
+			HowToSend:   strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(6) div:nth-of-type(2)").Text()),
+			Contact:     strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(7) div:nth-of-type(2)").Text()),
+			CountDown:   strings.TrimSpace(doc.Find(".flex-1.mt-5 .flex.items-center.mb-5:nth-of-type(1)").Text()),
+		}
+		if doc.Find(".whitespace-no-wrap.mr-3").Length() == 1 {
+			MoleculesInfo.Floor = strings.TrimSpace(doc.Find(".whitespace-no-wrap.mr-3").Siblings().First().Text())
+		}
+		response.Post.ExtraInfo = MoleculesInfo
 	}
 
 	doc.Find(gh.Selectors.CommentList).Each(func(_ int, selection *goquery.Selection) {
@@ -525,7 +557,7 @@ func (gh *geekHub) GetSignStatus() (bool, string, error) {
 	}
 
 	token, _ := doc.Find("head meta").Eq(3).Attr("content")
-	content := doc.Find(".btn.btn-blue.btn-big.block.text-center").Text()
+	content := doc.Find(gh.Selectors.CheckInButton).Text()
 	if content == "签到" {
 		return false, token, nil
 	} else {

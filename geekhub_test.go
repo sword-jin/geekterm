@@ -28,7 +28,7 @@ func (GeekHubTestSuite) TestGetMoleculesPage() {
 
 func (GeekHubTestSuite) TestGetPostContent() {
 	//spew.Dump(geekhub.GeekHub.GetPostContent("/posts/715"))
-	spew.Dump(geekhub.GeekHub.GetPostContent("/molecules/26?page=2"))
+	spew.Dump(geekhub.GeekHub.GetPostContent("/molecules/58", 1))
 }
 
 func (GeekHubTestSuite) TestGetActivities() {
