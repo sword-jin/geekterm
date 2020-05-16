@@ -7,3 +7,4 @@ version:beta0.3
     - Star
     - Score
 - 修复自动签到后的展示
+- 优化更新用户数据区域的操作

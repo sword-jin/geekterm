@@ -1,6 +1,7 @@
 package geekhub
 
 import (
+	"bytes"
 	"fmt"
 	"time"
 
@@ -42,6 +43,7 @@ var (
 	newVersionPage    *tview.Frame
 
 	pages *tview.Pages
+	app   *tview.Application
 
 	replyFlex         *tview.Flex
 	replyForm         *tview.Form
@@ -53,6 +55,7 @@ var (
 	curPost             *DetailPost
 	curPreviewPost      *PreviewPost
 	curAuth             *AuthInfo
+	curAuthUserDetail   *UserDetail
 	curCommentPage      int
 	curCommentTotalPage int64
 	curComment          *Comment
@@ -61,6 +64,9 @@ var (
 
 	replyToken string
 	replyTo    int8
+
+	setAuthChan    = make(chan struct{}, 1)
+	enterGeekhubCh = make(chan struct{}, 1)
 )
 
 const (
@@ -68,10 +74,18 @@ const (
 	replyToComment
 )
 
-func Draw(app *tview.Application) {
+func Run() error {
+	return app.Run()
+}
+
+func Draw() {
+	app = tview.NewApplication()
+
+	initSetAuthStatusChan()
+
 	initCategory(app)
 
-	initAuthStatus()
+	initAuthStatus(app)
 
 	initSiderbar()
 
@@ -110,15 +124,33 @@ func Draw(app *tview.Application) {
 	app.SetRoot(pages, true)
 }
 
+func initSetAuthStatusChan() {
+	go func() {
+		for {
+			<-setAuthChan
+
+			if curAuth == nil {
+				authStatusView.Clear()
+				authStatusView.SetTitleAlign(tview.AlignCenter)
+				authStatusView.SetTextColor(tcell.ColorOrangeRed)
+				authStatusView.SetBorderPadding(0, 0, 0, 0)
+				authStatusView.Write([]byte(" 未登录 "))
+			} else {
+				setLoganAuthInfo(curAuth)
+			}
+		}
+	}()
+}
+
 func initSiderbar() {
 	siderbar = tview.NewFlex().SetDirection(tview.FlexRow)
 	siderbar.SetBorder(true).SetTitle(" 目录 ")
 	siderbar.SetBorderPadding(0, 0, 1, 1)
-	siderbar.AddItem(category, 0, 4, true)
+	siderbar.AddItem(category, 0, 3, true)
 	siderbar.AddItem(authStatusView, 0, 1, true)
 }
 
-func initAuthStatus() {
+func initAuthStatus(app *tview.Application) {
 	authStatusView = tview.NewTextView()
 	authStatusView.SetBorder(true)
 	authStatusView.SetTitle(" 用户 ")
@@ -127,17 +159,23 @@ func initAuthStatus() {
 		defer func() {
 			if err := recover(); err != nil {
 				//todo
+				Warnf("err: %v", err)
 			}
 		}()
+		<-enterGeekhubCh
 		for {
-			<-timer.C
-			Debugf("Refresh Auth Information.")
-			response, err := GeekHub.GetHomePage(1)
-			if err != nil {
-				// todo
-			} else {
-				setAuthInformation(response.AuthInfo)
+			if curAuth != nil {
+				response, err := GeekHub.GetMePage(curAuth.Me.PageUri)
+				if err != nil {
+					// todo
+				} else {
+					setAuthInformation(response.AuthInfo)
+					if response.AuthInfo.Me.UserDetail != nil {
+						curAuthUserDetail = response.AuthInfo.Me.UserDetail
+					}
+				}
 			}
+			<-timer.C
 		}
 	}()
 }
@@ -298,10 +336,7 @@ func enterGeekhub(app *tview.Application) {
 				globalHasCheckIn = true
 			}
 		}
-	}
-
-	if globalHasCheckIn {
-		setLoganAuthInfo(curAuth)
+		enterGeekhubCh <- struct{}{}
 	}
 }
 
@@ -426,27 +461,31 @@ func doRequestPost(uri string, page int) *ContentPageResponse {
 	contentView.SetTitle(fmt.Sprintf("  内容(%s)  ", curPost.PV))
 	contentView.Clear()
 	contentView.ScrollToBeginning()
-	contentView.Write([]byte(`  标题：` + curPost.Title + "\n"))
-	contentView.Write([]byte("  楼主：" + curPost.Author.Username + "发布于" + curPost.PublishTime + "\n\n"))
+	content := bytes.NewBufferString(`  标题：` + curPost.Title + "\n")
+	content.Write([]byte("  楼主：" + curPost.Author.Username + "发布于" + curPost.PublishTime + "\n\n"))
 
 	if curPost.PostType == MoleculeType {
 		moleculeInfo, ok := curPost.ExtraInfo.(*MoleculesInfo)
 		if ok {
-			contentView.Write([]byte(`  分子贴：` + moleculeInfo.Name + "\n"))
-			contentView.Write([]byte(`  价值：` + moleculeInfo.Price + "\n"))
-			contentView.Write([]byte(`  中奖比例：` + moleculeInfo.Molecule + "/" + moleculeInfo.Denominator + "\n"))
-			contentView.Write([]byte(`  物流：` + moleculeInfo.HowToSend + "\n"))
-			contentView.Write([]byte(`  联系方式：` + moleculeInfo.Contact + "\n"))
+			content.Write([]byte(`  分子贴：` + moleculeInfo.Name + "\n"))
+			if moleculeInfo.Floor == "" {
+				content.Write([]byte(`  ` + formatSeconds(moleculeInfo.CountDown) + "\n"))
+			}
+			content.Write([]byte(`  价值：` + moleculeInfo.Price + "\n"))
+			content.Write([]byte(`  中奖比例：` + moleculeInfo.Molecule + "/" + moleculeInfo.Denominator + "\n"))
+			content.Write([]byte(`  物流：` + moleculeInfo.HowToSend + "\n"))
+			content.Write([]byte(`  联系方式：` + moleculeInfo.Contact + "\n"))
 
 			if moleculeInfo.Floor != "" {
-				contentView.Write([]byte(`  分子楼层：` + moleculeInfo.Floor + "\n\n"))
+				content.Write([]byte(`  分子楼层：` + moleculeInfo.Floor + "\n\n"))
 			} else {
-				contentView.Write([]byte("\n"))
+				content.Write([]byte("\n"))
 			}
 		}
 	}
 
-	contentView.Write([]byte(postResponse.Post.Content))
+	content.Write([]byte(postResponse.Post.Content))
+	contentView.Write(content.Bytes())
 	return postResponse
 }
 
@@ -455,29 +494,30 @@ func getPostSecondaryText(post *PreviewPost) string {
 }
 
 func setAuthInformation(authInfo *AuthInfo) {
-	if authInfo == nil {
-		authStatusView.Clear()
-		authStatusView.SetTitleAlign(tview.AlignCenter)
-		authStatusView.SetTextColor(tcell.ColorOrangeRed)
-		authStatusView.SetBorderPadding(0, 0, 0, 0)
-		authStatusView.Write([]byte(" 未登录 "))
-	} else {
-		setLoganAuthInfo(authInfo)
-	}
+	curAuth = authInfo
+	setAuthChan <- struct{}{}
 }
 
 func setLoganAuthInfo(authInfo *AuthInfo) {
-	curAuth = authInfo
-
 	authStatusView.Clear()
 	authStatusView.SetBorderColor(tcell.ColorGreen)
 	authStatusView.SetBorderPadding(0, 0, 1, 0)
-	authStatusView.Write([]byte(authInfo.Me.Username + "\n"))
-	authStatusView.Write([]byte("⏰: " + authInfo.NotifyCount + " 未读\n"))
+
+	content := bytes.NewBufferString(authInfo.Me.Username + "\n")
+	content.Write([]byte("⏰: " + authInfo.NotifyCount + " 未读\n"))
+	if curAuthUserDetail != nil {
+		content.Write([]byte("Gbit: " + curAuthUserDetail.Gbit + "\n"))
+		content.Write([]byte("Star: " + curAuthUserDetail.Star + "\n"))
+		content.Write([]byte("Score: " + curAuthUserDetail.Score + "\n"))
+	}
 
 	if globalHasCheckIn {
-		authStatusView.Write([]byte("已签到\n"))
+		content.Write([]byte("已签到\n"))
 	}
+
+	Debugf(content.String())
+	authStatusView.Write(content.Bytes())
+	app.Draw()
 }
 
 func showActivities(app *tview.Application) {

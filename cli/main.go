@@ -6,14 +6,12 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/rivo/tview"
 	geekhub "github.com/rrylee/geekterm"
 	"github.com/spf13/viper"
 )
 
 var (
 	geekhubDir string
-	app        *tview.Application // The tview application.
 )
 
 var (
@@ -37,14 +35,12 @@ func main() {
 	cfg := initConfig(v)
 
 	//Start the application.
-	app = tview.NewApplication()
-
 	geekhub.Setup(cfg)
-	geekhub.Draw(app)
-	geekhub.Keybinds(app)
-	geekhub.WatchUpgrade(app)
+	geekhub.Draw()
+	geekhub.Keybinds()
+	geekhub.WatchUpgrade()
 
-	if err := app.Run(); err != nil {
+	if err := geekhub.Run(); err != nil {
 		fmt.Printf("Error running application: %s\n", err)
 	}
 }

@@ -3,6 +3,7 @@ package geekhub
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -61,6 +62,7 @@ type ConfigAttrSelectors struct {
 	CommentParentContent      string
 	CommentCurPage            string
 	CheckInButton             string
+	MoleculeSeconds           string
 }
 
 func GetDefaultConfigAttrSelectors() *ConfigAttrSelectors {
@@ -96,12 +98,20 @@ func GetDefaultConfigAttrSelectors() *ConfigAttrSelectors {
 		ReplyToken:                "form#comment-box-form>input:nth-of-type(1)",
 		CommentCurPage:            "nav .px-2.py-px.rounded.bg-primary-300",
 		CheckInButton:             ".btn.btn-blue.btn-big.block.text-center",
+		MoleculeSeconds:           "var seconds = ",
 	}
 }
 
+type UserDetail struct {
+	Star  string
+	Gbit  string
+	Score string
+}
+
 type User struct {
-	Username string
-	PageUri  string
+	Username   string
+	PageUri    string
+	UserDetail *UserDetail
 }
 
 type PreviewPost struct {
@@ -176,7 +186,7 @@ type MoleculesInfo struct {
 	Denominator string //分母
 	HowToSend   string
 	Contact     string
-	CountDown   string //倒计时
+	CountDown   int //倒计时
 	Floor       string
 }
 
@@ -217,7 +227,12 @@ type ActivitiesPageResponse struct {
 	Activities []*Activity
 }
 
+type MePageResponse struct {
+	*BasePageInfo
+}
+
 type IGeekHub interface {
+	GetMePage(userUri string) (*MePageResponse, error) //个人中心
 	GetHomePage(page int) (*PostPageResponse, error)
 	GetPostsPage(page int) (*PostPageResponse, error)
 	GetSecondHandsPage(page int) (*PostPageResponse, error)
@@ -362,11 +377,16 @@ func (gh *geekHub) GetPostContent(pageUri string, page int) (*ContentPageRespons
 			Denominator: strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(5) div:nth-of-type(2)").Text()),
 			HowToSend:   strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(6) div:nth-of-type(2)").Text()),
 			Contact:     strings.TrimSpace(doc.Find(".flex-1.mt-5:nth-of-type(1) .flex.items-center:nth-of-type(7) div:nth-of-type(2)").Text()),
-			CountDown:   strings.TrimSpace(doc.Find(".flex-1.mt-5 .flex.items-center.mb-5:nth-of-type(1)").Text()),
 		}
 		if doc.Find(".whitespace-no-wrap.mr-3").Length() == 1 {
 			MoleculesInfo.Floor = strings.TrimSpace(doc.Find(".whitespace-no-wrap.mr-3").Siblings().First().Text())
 		}
+
+		script := strings.TrimSpace(doc.Find("script").Eq(3).Text())
+		reg := regexp.MustCompile(`var seconds = \d+`)
+		seconds := bytes.TrimLeft(reg.Find([]byte(script)), gh.Selectors.MoleculeSeconds)
+		MoleculesInfo.CountDown, _ = strconv.Atoi(string(seconds))
+
 		response.Post.ExtraInfo = MoleculesInfo
 	}
 
@@ -576,4 +596,25 @@ func (gh *geekHub) CheckIn(token string) error {
 		Post(HomePage + SignURI)
 	Debugf("CheckIn response body:%s", string(response.Body()))
 	return err
+}
+
+func (gh *geekHub) GetMePage(userUri string) (*MePageResponse, error) {
+	doc, err := gh.getQueryDocFromUrl(HomePage + userUri)
+	if err != nil {
+		return nil, err
+	}
+
+	userDetail := &UserDetail{
+		Star:  doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(1)").Text(),
+		Gbit:  doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(2)").Text(),
+		Score: doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(3)").Text(),
+	}
+
+	response := &MePageResponse{
+		BasePageInfo: gh.getAuthFromHtml(doc),
+	}
+	if response.BasePageInfo.AuthInfo != nil {
+		response.BasePageInfo.AuthInfo.Me.UserDetail = userDetail
+	}
+	return response, nil
 }

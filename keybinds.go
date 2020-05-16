@@ -6,7 +6,7 @@ import (
 	"github.com/rivo/tview"
 )
 
-func Keybinds(app *tview.Application) {
+func Keybinds() {
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		Debugf(spew.Sdump(event))
 

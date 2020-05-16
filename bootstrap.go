@@ -57,7 +57,7 @@ func Setup(cfg *Config) {
 	}
 }
 
-func WatchUpgrade(app *tview.Application) {
+func WatchUpgrade() {
 	go func() {
 		firstTimer := time.NewTimer(3 * time.Second)
 		<-firstTimer.C
