@@ -76,6 +76,9 @@ func Keybinds() {
 					OpenChrome(curPreviewPost)
 				}
 			}
+			if curFocus == activityList {
+				OpenChrome(NewOpenableUrl(HomePage + ActivitiesURI))
+			}
 		case 'i':
 			//打开个人未读
 			if curAuth == nil {

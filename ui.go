@@ -110,8 +110,8 @@ func Draw() {
 	//布局
 	mainFlex = tview.NewFlex()
 	mainFlex.SetTitle("terminal for Geekhub.com.")
-	mainFlex.AddItem(siderbar, 0, 1, true).
-		AddItem(posts, 0, 5, false)
+	mainFlex.AddItem(siderbar, 0, 2, true).
+		AddItem(posts, 0, 7, false)
 
 	pages = tview.NewPages().
 		AddPage("welcome", welcomePage, true, true).
@@ -427,7 +427,7 @@ func loadPost(app *tview.Application, post *PreviewPost) *tview.List {
 
 func doLoadPost(uri string, page int) {
 	if !contentShowing {
-		mainFlex.AddItem(contentFlex, 0, 5, false)
+		mainFlex.AddItem(contentFlex, 0, 6, false)
 		contentShowing = true
 	}
 	postResponse := doRequestPost(uri, page)
@@ -443,7 +443,11 @@ func doLoadPost(uri string, page int) {
 		commentList.SetTitle(fmt.Sprintf("  评论第%d页  ", curCommentPage))
 	}
 	for _, comment := range comments {
-		commentList.AddItem(comment.Floor+" "+comment.Content, fmt.Sprintf("「%s」%s", comment.Author.Username, comment.CommentTime), 0, nil)
+		second := fmt.Sprintf("「%s」%s", comment.Author.Username, comment.CommentTime)
+		if comment.Parent != nil {
+			second += comment.Parent.Author.Username + ": " + comment.Parent.Content
+		}
+		commentList.AddItem(comment.Floor+" "+comment.Content, second, 0, nil)
 	}
 
 	Debugf("curCommentPage is %d", curCommentPage)
@@ -555,10 +559,11 @@ func showActivities(app *tview.Application) {
 				activityList.AddItem(fmt.Sprintf("%s %s", activity.Time, activity.Content), "福利订单", 0, func() {
 					OpenChrome(NewOpenableUrl(HomePage + GbitOrderURI))
 				})
+			} else if activity.Type == OrderComment {
+				activityList.AddItem(fmt.Sprintf("%s", activity.Content), "订单评价", 0, nil)
 			} else if activity.Type == Unknow {
-				activityList.AddItem("未适配，按 enter 进入 bug 提交页面", "福利订单", 0, func() {
-					// todo 打开 github issue 页面
-					//OpenChrome(NewOpenableUrl(HomePage + GbitOrderURI))
+				activityList.AddItem("🐞 🐞 🐞 🐞 🐞 🐞 🐞 🐞 🐞", "出现bug了，来github提交bug吧", 0, func() {
+					OpenChrome(NewOpenableUrl("https://github.com/rrylee/geekterm/issues"))
 				})
 			}
 		}(activity)

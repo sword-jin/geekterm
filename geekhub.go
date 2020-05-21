@@ -206,6 +206,7 @@ const (
 	GbitOrder
 	GetMolecules        //抢到分子
 	YourMoleculesFinish //分子结束
+	OrderComment        //评价订单
 	Unknow              //未识别的
 )
 
@@ -396,7 +397,7 @@ func (gh *geekHub) GetPostContent(pageUri string, page int) (*ContentPageRespons
 		if parentUser != "" {
 			parent = &Comment{
 				Author: &User{
-					Username: "",
+					Username: parentUser,
 				},
 				Content: strings.TrimSpace(selection.Find(gh.Selectors.CommentParentContent).Text()),
 			}
@@ -525,6 +526,12 @@ func (gh *geekHub) GetActivities(page int) (*ActivitiesPageResponse, error) {
 					User:        nil,
 					Time:        strings.TrimSpace(selection.Find(gh.Selectors.ActivityTime).Text()),
 				})
+			} else if strings.Contains(content, "已经对您评价") {
+				response.Activities = append(response.Activities, &Activity{
+					Type:    OrderComment,
+					Content: content,
+					Time:    strings.TrimSpace(selection.Find(gh.Selectors.ActivityTime).Text()),
+				}) //保留一个空的，如果有新的出现，会看到明显的bug
 			} else {
 				response.Activities = append(response.Activities, &Activity{
 					Type: Unknow,
@@ -605,8 +612,8 @@ func (gh *geekHub) GetMePage(userUri string) (*MePageResponse, error) {
 	}
 
 	userDetail := &UserDetail{
-		Star:  doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(1)").Text(),
-		Gbit:  doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(2)").Text(),
+		Gbit:  doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(1)").Text(),
+		Star:  doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(2)").Text(),
 		Score: doc.Find("sidebar .box:nth-of-type(2)>div div:nth-of-type(2) div:nth-of-type(3)").Text(),
 	}
 
